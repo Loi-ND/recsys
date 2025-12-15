@@ -1525,7 +1525,7 @@ class ItemGroupTimeHistory(ItemGroupRetrieveRule):
     def __init__(
         self,
         customer_list: List,
-        trans_df: pd.DataFrame,
+        trans: pd.DataFrame,
         item_df: pd.DataFrame,
         cat_cols: List[str],
         n: int = 12,
@@ -1552,7 +1552,7 @@ class ItemGroupTimeHistory(ItemGroupRetrieveRule):
             Length of time window for popularity calculation.
         """
         self.customer_list = customer_list
-        self.trans_df = trans_df[['customer_id', item_id, "t_dat"]].copy()
+        self.trans_df = trans[['customer_id', item_id, "t_dat"]].copy()
         self.item_df = item_df[[item_id, *cat_cols]].copy()
         self.trans_df = self.trans_df.merge(
             self.item_df, on=item_id, how="left"
@@ -1597,7 +1597,7 @@ class ItemGroupSaleTrend(ItemGroupRetrieveRule):
     def __init__(
         self,
         customer_list: List,
-        trans_df: pd.DataFrame,
+        trans: pd.DataFrame,
         item_df: pd.DataFrame,
         cat_cols: List[str],
         days: int = 7,
@@ -1628,7 +1628,7 @@ class ItemGroupSaleTrend(ItemGroupRetrieveRule):
         """
         self.iid = item_id
         self.customer_list = customer_list
-        self.trans_df = trans_df[["customer_id", self.iid, "t_dat"]].copy()
+        self.trans_df = trans[["customer_id", self.iid, "t_dat"]].copy()
         self.item_df = item_df[[item_id, *cat_cols]].copy()
         self.trans_df = self.trans_df.merge(
             self.item_df, on=item_id, how="left"
