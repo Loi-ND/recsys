@@ -1330,7 +1330,7 @@ class TimeHistory(GlobalRetrieveRule):
         """
         self.iid = item_id
         self.customer_list = customer_list
-        self.trans_df = trans_df[["customer_id", self.iid, "t_dat"]]
+        self.trans_df = trans[["customer_id", self.iid, "t_dat"]]
         self.unique = unique
         self.n = n
         self.name = name
@@ -1371,7 +1371,7 @@ class TimeHistoryDecay(GlobalRetrieveRule):
     def __init__(
         self,
         customer_list: List,
-        trans_df: pd.DataFrame,
+        trans: pd.DataFrame,
         days: int = 7,
         n: int = 12,
         name: str = "1",
@@ -1396,7 +1396,7 @@ class TimeHistoryDecay(GlobalRetrieveRule):
         """
         self.iid = item_id
         self.customer_list = customer_list
-        self.trans_df = trans_df[["customer_id", self.iid, "t_dat"]]
+        self.trans_df = trans[["customer_id", self.iid, "t_dat"]]
         self.days = days
         self.n = n
         self.name = name
@@ -1452,7 +1452,7 @@ class SaleTrend(GlobalRetrieveRule):
     def __init__(
         self,
         customer_list: List,
-        trans_df: pd.DataFrame,
+        trans: pd.DataFrame,
         days: int = 7,
         n: int = 12,
         name: str = "1",
@@ -1480,7 +1480,7 @@ class SaleTrend(GlobalRetrieveRule):
         """
         self.iid = item_id
         self.customer_list = customer_list
-        self.trans_df = trans_df[["customer_id", self.iid, "t_dat"]]
+        self.trans_df = trans[["customer_id", self.iid, "t_dat"]]
         self.days = days
         self.n = n
         self.t = t
