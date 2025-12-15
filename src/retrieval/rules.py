@@ -1576,6 +1576,7 @@ class ItemGroupTimeHistory(ItemGroupRetrieveRule):
 
         # chỉ COPY sau khi cắt window
         df = df.loc[t_dat >= min_date].copy()
+        del t_dat 
 
         df["count"] = 1
         df = (
@@ -1659,6 +1660,8 @@ class ItemGroupSaleTrend(ItemGroupRetrieveRule):
         group_a = df.loc[dat_gap > self.days - 1].copy()   # cũ hơn
         group_b = df.loc[dat_gap <= self.days - 1].copy()  # gần đây
 
+        del t_dat 
+        del dat_gap
         group_a["count"] = 1
         group_b["count"] = 1
 
