@@ -49,39 +49,28 @@ class UserGroupRetrieveRule(ABC):
 class ItemGroupRetrieveRule(ABC):
     """Use certain rules to respectively retrieve items in each group of items."""
 
-    def merge(self, top_items: pd.DataFrame) -> pd.DataFrame:
+    def merge(self, top_items: pd.DataFrame):
         """
         top_items gồm:
             cat_cols + [item_id, score, method]
         """
 
-        # ===== 1. User → group (MỖI GROUP 1 DÒNG / USER) =====
-        user_group = (
-            self.trans_df[["customer_id", *self.cat_cols]]
-            .drop_duplicates()
-        )
+        # 1. Lấy transaction để map user -> item -> cat_cols
+        trans = self.trans_df[["customer_id", self.iid] + list(self.cat_cols)].drop_duplicates()
 
-        # Chỉ giữ user cần recommend
-        user_group = user_group[
-            user_group["customer_id"].isin(self.customer_list)
-        ]
+        # 2. Map user -> tất cả các group cat_cols mà họ đã mua
+        user_group = trans[["customer_id"] + list(self.cat_cols)].drop_duplicates()
 
-        # ===== 2. Group → top items (đã cắt TOP-N từ retrieve) =====
-        # ⚠️ Đây là join "nhẹ" vì:
-        # - user_group nhỏ
-        # - top_items đã top-n
+        # 3. Lọc theo danh sách khách hàng cần recommend
+        user_group = user_group[user_group["customer_id"].isin(self.customer_list)]
 
-        result = user_group.merge(
-            top_items,
-            on=list(self.cat_cols),
-            how="left"
-        )
+        # 4. Join user_group với top_items theo cat_cols => user chỉ nhận item nhóm mình mua
+        result = user_group.merge(top_items, on=list(self.cat_cols), how="left")
 
-        # ===== 3. Chuẩn hoá output =====
-        result = result[["customer_id", self.iid, "score", "method"]]
+        # 5. Chỉ giữ cột cần thiết
+        result = result[["customer_id"] + list(self.cat_cols) + [self.iid, "score", "method"]]
 
         return result
-
     
     @abstractmethod
     def retrieve(self) -> pd.DataFrame:
