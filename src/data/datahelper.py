@@ -99,7 +99,7 @@ class DataHelper:
             Subdirectory to store raw data.
         """
         self.base = Path(data_dir)  # data diectory
-        self.raw_dir = self.base  # raw data directory
+        self.raw_dir = "/kaggle/input/h-and-m-csv-dataset" # raw data directory
 
     def _load_raw_data(self) -> dict:
         """Load original raw data
