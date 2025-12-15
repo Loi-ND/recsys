@@ -1599,7 +1599,7 @@ class ItemGroupTimeHistory(ItemGroupRetrieveRule):
             result_df
             .sort_values(["customer_id", "score"], ascending=[True, False])
             .groupby("customer_id", as_index=False, group_keys=False)
-            .head(200)
+            .head(100)
         )
 
         return result_df[["customer_id", self.iid, "method", "score"]]
@@ -1697,7 +1697,7 @@ class ItemGroupSaleTrend(ItemGroupRetrieveRule):
             result_df
             .sort_values(["customer_id", "score"], ascending=[True, False])
             .groupby("customer_id", as_index=False, group_keys=False)
-            .head(200)
+            .head(100)
         )
 
         return result_df[["customer_id", self.iid, "method", "score"]]
