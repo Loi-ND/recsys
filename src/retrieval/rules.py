@@ -1566,29 +1566,37 @@ class ItemGroupTimeHistory(ItemGroupRetrieveRule):
         self.days = days
 
     def retrieve(self) -> pd.DataFrame:
-        df = self.trans_df
+        df = self.trans_df  # KHÔNG copy
 
-        # 1. Lấy dữ liệu gần nhất
-        max_date = df['t_dat'].max()
+        # đảm bảo t_dat là datetime (nếu đã làm ở __init__ thì rất rẻ)
+        t_dat = df["t_dat"]
+
+        max_date = t_dat.max()
         min_date = max_date - pd.Timedelta(days=self.days)
-        df = df[df['t_dat'] >= min_date].copy()
+
+        # chỉ COPY sau khi cắt window
+        df = df.loc[t_dat >= min_date].copy()
 
         df["count"] = 1
-        df = df.groupby([*self.cat_cols, self.iid], as_index=False)["count"].sum()
-        df["rank"] = df.groupby(self.cat_cols)["count"].rank(
-            ascending=False, method="first"
+        df = (
+            df.groupby([*self.cat_cols, self.iid], as_index=False)["count"]
+            .sum()
         )
 
-        # if self.scale:
-        #     df["score"] = df["count"] / df["count"].max()
-        # else:
+        df["rank"] = df.groupby(self.cat_cols)["count"].rank(
+            ascending=False,
+            method="first"
+        )
+
         df["score"] = df["count"]
-        df["method"] = "IGTimeHistory_" + self.name
-        df = df[df["rank"] <= self.n][[*self.cat_cols, self.iid, "score", "method"]]
+        df["method"] = f"IGTimeHistory_{self.name}"
 
-        df = self.merge(df)
+        df = df.loc[df["rank"] <= self.n, [*self.cat_cols, self.iid, "score", "method"]]
 
-        return df[["customer_id", self.iid, "method", "score"]] 
+        result_df = self.merge(df)
+
+        return result_df[["customer_id", self.iid, "method", "score"]]
+
    
 class ItemGroupSaleTrend(ItemGroupRetrieveRule):
     """Retrieve trending items in a specified time window for each item group."""
@@ -1639,43 +1647,42 @@ class ItemGroupSaleTrend(ItemGroupRetrieveRule):
         self.name = name
 
     def retrieve(self) -> pd.DataFrame:
-        df = self.trans_df
-        df = df.copy()
-        df["t_dat"] = pd.to_datetime(df["t_dat"])
-        df["dat_gap"] = (df["t_dat"].max() - df["t_dat"]).dt.days
+        df = self.trans_df  # KHÔNG copy
 
-        # Lọc dữ liệu trong 2 * days gần nhất
-        df = df[df["dat_gap"] <= 2 * self.days - 1]
-        group_a = df[df["dat_gap"] > self.days - 1].copy()  # cũ hơn
-        group_b = df[df["dat_gap"] <= self.days - 1].copy()  # gần đây
+        t_dat = pd.to_datetime(df["t_dat"])
+        dat_gap = (t_dat.max() - t_dat).dt.days
 
-        # Tính số lượt mua
+        # lọc 2 * days gần nhất
+        df = df.loc[dat_gap <= 2 * self.days - 1].copy()
+        dat_gap = dat_gap.loc[df.index]
+
+        group_a = df.loc[dat_gap > self.days - 1].copy()   # cũ hơn
+        group_b = df.loc[dat_gap <= self.days - 1].copy()  # gần đây
+
         group_a["count"] = 1
         group_b["count"] = 1
+
         group_a = group_a.groupby([*self.cat_cols, self.iid])["count"].sum().reset_index()
         group_b = group_b.groupby([*self.cat_cols, self.iid])["count"].sum().reset_index()
 
-        # Tính trend
         log = pd.merge(group_b, group_a, on=[*self.cat_cols, self.iid], how="left")
         log["count_y"] = log["count_y"].fillna(0)
         log["trend"] = (log["count_x"] - log["count_y"]) / log["count_x"]
 
-        # Lọc trend > t
         log = log[log["trend"] > self.t]
-        log = log.sort_values(by=["count_x", "trend"], ascending=False).reset_index(drop=True)
-
-        # Lấy top-n mỗi nhóm item
-        log["rank"] = log.groupby([*self.cat_cols])["trend"].rank(ascending=False, method="first")
+        log["rank"] = log.groupby(self.cat_cols)["trend"].rank(
+            ascending=False, method="first"
+        )
         log = log[log["rank"] <= self.n]
 
         log["method"] = f"ItemGroupSaleTrend_{self.name}"
         log["score"] = log["trend"]
+
         log = log[[*self.cat_cols, self.iid, "method", "score"]]
 
         result_df = self.merge(log)
-
         return result_df[["customer_id", self.iid, "method", "score"]]
-    
+
 class ItemSimilarity(PersonalRetrieveRule):
     """Retrieve similar items based on precomputed embeddings or TF-IDF."""
 
