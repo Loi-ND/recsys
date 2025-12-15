@@ -1602,6 +1602,10 @@ class ItemGroupSaleTrend(ItemGroupRetrieveRule):
     def retrieve(self) -> pd.DataFrame:
         df = self.trans_df
 
+
+        if not pd.api.types.is_datetime64_any_dtype(df["t_dat"]):
+            df = df.assign(t_dat=pd.to_datetime(df["t_dat"]))
+
         max_date = df["t_dat"].max()
         min_date = max_date - pd.Timedelta(days=2 * self.days)
         df = df[df["t_dat"] >= min_date]
