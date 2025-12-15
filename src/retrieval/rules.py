@@ -1568,7 +1568,7 @@ class ItemGroupTimeHistory(ItemGroupRetrieveRule):
     def retrieve(self) -> pd.DataFrame:
         df = self.trans_df  # KHÔNG copy
 
-        # đảm bảo t_dat là datetime (nếu đã làm ở __init__ thì rất rẻ)
+        # đảm bảo t_dat là datetime (nếu đã làm ở __init__ thì rẻ)
         t_dat = pd.to_datetime(df["t_dat"])
 
         max_date = t_dat.max()
@@ -1576,13 +1576,10 @@ class ItemGroupTimeHistory(ItemGroupRetrieveRule):
 
         # chỉ COPY sau khi cắt window
         df = df.loc[t_dat >= min_date].copy()
-        del t_dat 
+        del t_dat
 
         df["count"] = 1
-        df = (
-            df.groupby([*self.cat_cols, self.iid], as_index=False)["count"]
-            .sum()
-        )
+        df = df.groupby([*self.cat_cols, self.iid], as_index=False)["count"].sum()
 
         df["rank"] = df.groupby(self.cat_cols)["count"].rank(
             ascending=False,
@@ -1594,10 +1591,18 @@ class ItemGroupTimeHistory(ItemGroupRetrieveRule):
 
         df = df.loc[df["rank"] <= self.n, [*self.cat_cols, self.iid, "score", "method"]]
 
+        # merge với user
         result_df = self.merge(df)
 
-        return result_df[["customer_id", self.iid, "method", "score"]]
+        # 🔥 giới hạn tối đa 100 item / user
+        result_df = (
+            result_df
+            .sort_values(["customer_id", "score"], ascending=[True, False])
+            .groupby("customer_id", as_index=False, group_keys=False)
+            .head(200)
+        )
 
+        return result_df[["customer_id", self.iid, "method", "score"]]
    
 class ItemGroupSaleTrend(ItemGroupRetrieveRule):
     """Retrieve trending items in a specified time window for each item group."""
@@ -1660,8 +1665,9 @@ class ItemGroupSaleTrend(ItemGroupRetrieveRule):
         group_a = df.loc[dat_gap > self.days - 1].copy()   # cũ hơn
         group_b = df.loc[dat_gap <= self.days - 1].copy()  # gần đây
 
-        del t_dat 
+        del t_dat
         del dat_gap
+
         group_a["count"] = 1
         group_b["count"] = 1
 
@@ -1683,7 +1689,17 @@ class ItemGroupSaleTrend(ItemGroupRetrieveRule):
 
         log = log[[*self.cat_cols, self.iid, "method", "score"]]
 
+        # merge với user
         result_df = self.merge(log)
+
+        # 🔥 giới hạn tối đa 100 item / user
+        result_df = (
+            result_df
+            .sort_values(["customer_id", "score"], ascending=[True, False])
+            .groupby("customer_id", as_index=False, group_keys=False)
+            .head(200)
+        )
+
         return result_df[["customer_id", self.iid, "method", "score"]]
 
 class ItemSimilarity(PersonalRetrieveRule):
