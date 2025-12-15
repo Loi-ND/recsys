@@ -1304,7 +1304,7 @@ class TimeHistory(GlobalRetrieveRule):
     def __init__(
         self,
         customer_list: List,
-        trans_df: pd.DataFrame,
+        trans: pd.DataFrame,
         days: int=30,
         n: int = 12,
         name: str = "1",
