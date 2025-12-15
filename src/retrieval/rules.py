@@ -1520,7 +1520,7 @@ class SaleTrend(GlobalRetrieveRule):
 # * ====================== Item Group Retrieve Rule ====================== *
 
 class ItemGroupTimeHistory(ItemGroupRetrieveRule):
-    """Retrieve popular items of each item group in a specified time window."""
+    """Retrieve popular items of each **item group** in a specified time window."""
 
     def __init__(
         self,
@@ -1533,9 +1533,32 @@ class ItemGroupTimeHistory(ItemGroupRetrieveRule):
         item_id: str = "article_id",
         days: int = 7,
     ):
+        """
+        Parameters
+        ----------
+        customer_list : List
+            List of target customer IDs.
+        trans_df : pd.DataFrame
+            Transaction dataframe with at least [customer_id, article_id, t_dat].
+        cat_cols : List[str]
+            Columns defining item groups (e.g., ['product_type_no', 'colour_group_code']).
+        n : int
+            Number of top items to retrieve per group.
+        name : str
+            Name of the rule, for method labeling.
+        item_id : str
+            Column name for item ID.
+        days : int
+            Length of time window for popularity calculation.
+        """
         self.customer_list = customer_list
-        self.trans_df = trans[["customer_id", item_id, "t_dat"]]   # ❗ KHÔNG copy
-        self.item_df = item_df[[item_id, *cat_cols]]               # ❗ KHÔNG copy
+        self.trans_df = trans[['customer_id', item_id, "t_dat"]]
+        self.item_df = item_df[[item_id, *cat_cols]].copy()
+        self.trans_df = self.trans_df.merge(
+            self.item_df, on=item_id, how="left"
+        )
+        self.trans_df['t_dat'] = pd.to_datetime(self.trans_df['t_dat'])
+
         self.cat_cols = cat_cols
         self.iid = item_id
         self.n = n
@@ -1545,34 +1568,27 @@ class ItemGroupTimeHistory(ItemGroupRetrieveRule):
     def retrieve(self) -> pd.DataFrame:
         df = self.trans_df
 
-        # 🔪 cắt sớm theo thời gian
-        max_date = df["t_dat"].max()
+        # 1. Lấy dữ liệu gần nhất
+        max_date = df['t_dat'].max()
         min_date = max_date - pd.Timedelta(days=self.days)
-        df = df[df["t_dat"] >= min_date]
-
-        # 🔗 merge item group SAU khi đã cắt
-        df = df.merge(self.item_df, on=self.iid, how="left")
+        df = df[df['t_dat'] >= min_date].copy()
 
         df["count"] = 1
-        agg = (
-            df.groupby([*self.cat_cols, self.iid], as_index=False)["count"]
-            .sum()
-        )
-
-        agg["rank"] = agg.groupby(self.cat_cols)["count"].rank(
+        df = df.groupby([*self.cat_cols, self.iid], as_index=False)["count"].sum()
+        df["rank"] = df.groupby(self.cat_cols)["count"].rank(
             ascending=False, method="first"
         )
 
-        agg = agg[agg["rank"] <= self.n]
-        agg["score"] = agg["count"]
-        agg["method"] = f"IGTimeHistory_{self.name}"
+        # if self.scale:
+        #     df["score"] = df["count"] / df["count"].max()
+        # else:
+        df["score"] = df["count"]
+        df["method"] = "IGTimeHistory_" + self.name
+        df = df[df["rank"] <= self.n][[*self.cat_cols, self.iid, "score", "method"]]
 
-        agg = agg[[*self.cat_cols, self.iid, "score", "method"]]
+        df = self.merge(df)
 
-        result = self.merge(agg)
-
-        return result[["customer_id", self.iid, "method", "score"]]
-
+        return df[["customer_id", self.iid, "method", "score"]] 
    
 class ItemGroupSaleTrend(ItemGroupRetrieveRule):
     """Retrieve trending items in a specified time window for each item group."""
@@ -1589,70 +1605,77 @@ class ItemGroupSaleTrend(ItemGroupRetrieveRule):
         t: float = 0.8,
         item_id: str = "article_id",
     ):
+        """
+        Parameters
+        ----------
+        customer_list : List
+            List of target customer IDs.
+        trans_df : pd.DataFrame
+            Transaction dataframe with at least ['customer_id', 'article_id', 't_dat'] + item group columns.
+        cat_cols : List[str]
+            Columns defining item groups (e.g., ['product_type_no', 'colour_group_code']).
+        days : int
+            Length of time window to calculate trends.
+        n : int
+            Top N items per item group.
+        name : str
+            Name of the rule for labeling.
+        t : float
+            Minimum trend ratio to consider an item trending.
+        item_id : str
+            Column name for item ID.
+        """
+        self.iid = item_id
         self.customer_list = customer_list
-        self.trans_df = trans[["customer_id", item_id, "t_dat"]]  # ❗ no copy
-        self.item_df = item_df[[item_id, *cat_cols]]
+        self.trans_df = trans[["customer_id", self.iid, "t_dat"]]
+        self.item_df = item_df[[item_id, *cat_cols]].copy()
+        self.trans_df = self.trans_df.merge(
+            self.item_df, on=item_id, how="left"
+        )
         self.cat_cols = cat_cols
         self.days = days
         self.n = n
         self.t = t
         self.name = name
-        self.iid = item_id
 
     def retrieve(self) -> pd.DataFrame:
         df = self.trans_df
+        df = df.copy()
+        df["t_dat"] = pd.to_datetime(df["t_dat"])
+        df["dat_gap"] = (df["t_dat"].max() - df["t_dat"]).dt.days
 
+        # Lọc dữ liệu trong 2 * days gần nhất
+        df = df[df["dat_gap"] <= 2 * self.days - 1]
+        group_a = df[df["dat_gap"] > self.days - 1].copy()  # cũ hơn
+        group_b = df[df["dat_gap"] <= self.days - 1].copy()  # gần đây
 
-        if not pd.api.types.is_datetime64_any_dtype(df["t_dat"]):
-            df = df.assign(t_dat=pd.to_datetime(df["t_dat"]))
+        # Tính số lượt mua
+        group_a["count"] = 1
+        group_b["count"] = 1
+        group_a = group_a.groupby([*self.cat_cols, self.iid])["count"].sum().reset_index()
+        group_b = group_b.groupby([*self.cat_cols, self.iid])["count"].sum().reset_index()
 
-        max_date = df["t_dat"].max()
-        min_date = max_date - pd.Timedelta(days=2 * self.days)
-        df = df[df["t_dat"] >= min_date]
+        # Tính trend
+        log = pd.merge(group_b, group_a, on=[*self.cat_cols, self.iid], how="left")
+        log["count_y"] = log["count_y"].fillna(0)
+        log["trend"] = (log["count_x"] - log["count_y"]) / log["count_x"]
 
-        df = df.merge(self.item_df, on=self.iid, how="left")
-
-        df["dat_gap"] = (max_date - df["t_dat"]).dt.days
-
-        group_a = df[df["dat_gap"] > self.days - 1]
-        group_b = df[df["dat_gap"] <= self.days - 1]
-
-        group_a = (
-            group_a.groupby([*self.cat_cols, self.iid])
-            .size()
-            .rename("count_a")
-            .reset_index()
-        )
-
-        group_b = (
-            group_b.groupby([*self.cat_cols, self.iid])
-            .size()
-            .rename("count_b")
-            .reset_index()
-        )
-
-        log = group_b.merge(
-            group_a, on=[*self.cat_cols, self.iid], how="left"
-        ).fillna(0)
-
-        log["trend"] = (log["count_b"] - log["count_a"]) / log["count_b"]
+        # Lọc trend > t
         log = log[log["trend"] > self.t]
+        log = log.sort_values(by=["count_x", "trend"], ascending=False).reset_index(drop=True)
 
-        log["rank"] = log.groupby(self.cat_cols)["trend"].rank(
-            ascending=False, method="first"
-        )
-
+        # Lấy top-n mỗi nhóm item
+        log["rank"] = log.groupby([*self.cat_cols])["trend"].rank(ascending=False, method="first")
         log = log[log["rank"] <= self.n]
 
         log["method"] = f"ItemGroupSaleTrend_{self.name}"
         log["score"] = log["trend"]
-
         log = log[[*self.cat_cols, self.iid, "method", "score"]]
 
-        result = self.merge(log)
+        result_df = self.merge(log)
 
-        return result[["customer_id", self.iid, "method", "score"]]
-
+        return result_df[["customer_id", self.iid, "method", "score"]]
+    
 class ItemSimilarity(PersonalRetrieveRule):
     """Retrieve similar items based on precomputed embeddings or TF-IDF."""
 
