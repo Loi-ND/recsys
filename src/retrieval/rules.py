@@ -80,7 +80,6 @@ class ItemGroupRetrieveRule(ABC):
             pd.DataFrame: (*group_cols, article_id, method, score)
         """
 
-
 class GlobalRetrieveRule(ABC):
     """Use certain rules to retrieve items for all customers."""
 
@@ -1531,7 +1530,6 @@ class ItemGroupTimeHistory(ItemGroupRetrieveRule):
         cat_cols: List[str],
         n: int = 12,
         name: str = "1",
-        t: float = 0.8,
         item_id: str = "article_id",
         days: int = 7,
     ):
@@ -1548,8 +1546,6 @@ class ItemGroupTimeHistory(ItemGroupRetrieveRule):
             Number of top items to retrieve per group.
         name : str
             Name of the rule, for method labeling.
-        t : float
-            Trend threshold ratio (optional, can be used if comparing two periods).
         item_id : str
             Column name for item ID.
         days : int
@@ -1563,15 +1559,10 @@ class ItemGroupTimeHistory(ItemGroupRetrieveRule):
         )
         self.trans_df['t_dat'] = pd.to_datetime(self.trans_df['t_dat'])
 
-        # 1. Lấy dữ liệu gần nhất
-        max_date = self.trans_df['t_dat'].max()
-        min_date = max_date - pd.Timedelta(days=days)
-        self.trans_df = self.trans_df[self.trans_df['t_dat'] >= min_date]
         self.cat_cols = cat_cols
         self.iid = item_id
         self.n = n
         self.name = name
-        self.t = t
         self.days = days
 
     def retrieve(self) -> pd.DataFrame:
@@ -1585,11 +1576,8 @@ class ItemGroupTimeHistory(ItemGroupRetrieveRule):
 
         df["count"] = 1
         df = df.groupby([*self.cat_cols, self.iid], as_index=False)["count"].sum()
-        df = df.sort_values(by="count", ascending=False).reset_index(drop=True)
-        df = df.reset_index()
-
-        df["rank"] = df.groupby([*self.cat_cols])["index"].rank(
-            ascending=True, method="first"
+        df["rank"] = df.groupby(self.cat_cols)["count"].rank(
+            ascending=False, method="first"
         )
 
         # if self.scale:
@@ -1601,8 +1589,7 @@ class ItemGroupTimeHistory(ItemGroupRetrieveRule):
 
         df = self.merge(df)
 
-        return df[["customer_id", self.iid, "method", "score"]]
-        
+        return df[["customer_id", self.iid, "method", "score"]] 
    
 class ItemGroupSaleTrend(ItemGroupRetrieveRule):
     """Retrieve trending items in a specified time window for each item group."""
@@ -1659,8 +1646,8 @@ class ItemGroupSaleTrend(ItemGroupRetrieveRule):
 
         # Lọc dữ liệu trong 2 * days gần nhất
         df = df[df["dat_gap"] <= 2 * self.days - 1]
-        group_a = df[df["dat_gap"] > self.days - 1]  # cũ hơn
-        group_b = df[df["dat_gap"] <= self.days - 1]  # gần đây
+        group_a = df[df["dat_gap"] > self.days - 1].copy()  # cũ hơn
+        group_b = df[df["dat_gap"] <= self.days - 1].copy()  # gần đây
 
         # Tính số lượt mua
         group_a["count"] = 1
@@ -1670,8 +1657,8 @@ class ItemGroupSaleTrend(ItemGroupRetrieveRule):
 
         # Tính trend
         log = pd.merge(group_b, group_a, on=[*self.cat_cols, self.iid], how="left")
-        log["count_x"] = log["count_x"].fillna(0)
-        log["trend"] = (log["count_x"] - log["count_y"]) / (log["count_y"] + 1)
+        log["count_y"] = log["count_y"].fillna(0)
+        log["trend"] = (log["count_x"] - log["count_y"]) / log["count_x"]
 
         # Lọc trend > t
         log = log[log["trend"] > self.t]
@@ -1685,9 +1672,7 @@ class ItemGroupSaleTrend(ItemGroupRetrieveRule):
         log["score"] = log["trend"]
         log = log[[*self.cat_cols, self.iid, "method", "score"]]
 
-        # Merge với customer_list: tạo cross join
-        tmp_df = pd.DataFrame({"customer_id": self.customer_list})
-        result_df = tmp_df.merge(log, how="cross")
+        result_df = self.merge(log)
 
         return result_df[["customer_id", self.iid, "method", "score"]]
 
