@@ -1594,14 +1594,6 @@ class ItemGroupTimeHistory(ItemGroupRetrieveRule):
         # merge với user
         result_df = self.merge(df)
 
-        # 🔥 giới hạn tối đa 100 item / user
-        result_df = (
-            result_df
-            .sort_values(["customer_id", "score"], ascending=[True, False])
-            .groupby("customer_id", as_index=False, group_keys=False)
-            .head(100)
-        )
-
         return result_df[["customer_id", self.iid, "method", "score"]]
    
 class ItemGroupSaleTrend(ItemGroupRetrieveRule):
@@ -1691,14 +1683,6 @@ class ItemGroupSaleTrend(ItemGroupRetrieveRule):
 
         # merge với user
         result_df = self.merge(log)
-
-        # 🔥 giới hạn tối đa 100 item / user
-        result_df = (
-            result_df
-            .sort_values(["customer_id", "score"], ascending=[True, False])
-            .groupby("customer_id", as_index=False, group_keys=False)
-            .head(100)
-        )
 
         return result_df[["customer_id", self.iid, "method", "score"]]
 
