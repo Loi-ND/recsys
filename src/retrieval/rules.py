@@ -1569,7 +1569,7 @@ class ItemGroupTimeHistory(ItemGroupRetrieveRule):
         df = self.trans_df  # KHÔNG copy
 
         # đảm bảo t_dat là datetime (nếu đã làm ở __init__ thì rất rẻ)
-        t_dat = df["t_dat"]
+        t_dat = pd.to_datetime(df["t_dat"])
 
         max_date = t_dat.max()
         min_date = max_date - pd.Timedelta(days=self.days)
