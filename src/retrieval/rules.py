@@ -68,7 +68,7 @@ class ItemGroupRetrieveRule(ABC):
         result = user_group.merge(top_items, on=list(self.cat_cols), how="left")
 
         # 5. Chỉ giữ cột cần thiết
-        result = result[["customer_id"] + list(self.cat_cols) + [self.iid, "score", "method"]]
+        result = result[["customer_id", self.iid, "score", "method"]]
 
         return result
     
