@@ -1595,12 +1595,6 @@ class ItemGroupTimeHistory(ItemGroupRetrieveRule):
         df = df.loc[df["rank"] <= self.n, [*self.cat_cols, self.iid, "score", "method"]]
 
         result_df = self.merge(df)
-        result_df = (
-            result_df
-            .sort_values(["customer_id", "score"], ascending=[True, False])
-            .groupby("customer_id", as_index=False)
-            .head(15)
-        )
         return result_df[["customer_id", self.iid, "method", "score"]]
 
    
@@ -1689,12 +1683,6 @@ class ItemGroupSaleTrend(ItemGroupRetrieveRule):
         log = log[[*self.cat_cols, self.iid, "method", "score"]]
 
         result_df = self.merge(log)
-        result_df = (
-            result_df
-            .sort_values(["customer_id", "score"], ascending=[True, False])
-            .groupby("customer_id", as_index=False)
-            .head(15)
-        )
         return result_df[["customer_id", self.iid, "method", "score"]]
 
 class ItemSimilarity(PersonalRetrieveRule):
