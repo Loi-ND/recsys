@@ -283,7 +283,7 @@ class OrderHistoryDecay(PersonalRetrieveRule):
         # 9. Ranking & filtering
         # ==============================
         df = df[df["value"] > 150]
-
+        print("hi")
         top_idx = (
                 df.groupby("customer_id", sort=False)["value"]
                 .nlargest(self.n)                         # lấy top-n theo value
