@@ -163,20 +163,20 @@ class OrderHistory(PersonalRetrieveRule):
         print("hi-2")
         res["diff_dat"] = (res.max_dat - res.t_dat).dt.days
         res = res.loc[res["diff_dat"] < self.days].reset_index(drop=True)
-
+        print("hi-3")
         res = res.sort_values(by=["diff_dat"], ascending=True).reset_index(drop=True)
         res = res.groupby(["customer_id", self.iid], as_index=False).first()
-
+        print("hi-4")
         res = res.reset_index()
         res = res.sort_values(by="index", ascending=False).reset_index(drop=True)
         res["rank"] = res.groupby(["customer_id"])["index"].rank(
             ascending=True, method="first"
         )
         res["score"] = -res["diff_dat"]
-
+        print("hi-5")
         if self.top_k is not None:
             res = res.loc[res["rank"] <= self.top_k]
-
+        print("hi-6")
         res["method"] = f"OrderHistory_{self.name}"
         res = res[["customer_id", self.iid, "score", "method"]]
         print("hi-3")
