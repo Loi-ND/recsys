@@ -214,13 +214,13 @@ class OrderHistoryDecay(PersonalRetrieveRule):
         self.n = n
 
     def retrieve(self):
-        
-        df = self.trans_df.copy()
-        df["t_dat"] = pd.to_datetime(df["t_dat"])
+
+        df = self.trans_df
 
         # ================
         # 1. Basic fields
         # ================
+        df["t_dat"] = pd.to_datetime(df["t_dat"])
         last_ts = df["t_dat"].max()
 
         df["dat_gap"] = (last_ts - df["t_dat"]).dt.days
@@ -237,37 +237,29 @@ class OrderHistoryDecay(PersonalRetrieveRule):
         # ===============================
         # 3. Tính period sale cho mỗi item
         # ===============================
-        period_sales = (
+        df["period_sale"] = (
             df.groupby(["last_day", self.iid])["t_dat"]
-            .count()
-            .rename("period_sale")
-            .reset_index()
-        )
-
-        # ===============================
-        # 4. Merge period sale theo từng bản ghi
-        # ===============================
-        df = df.merge(
-            period_sales,
-            on=["last_day", self.iid],
-            how="left"
+              .transform("count")
         )
 
         # ===========================================
         # 5. Lấy period_sale của ngày cuối để so sánh
         # ===========================================
-        last_ps = period_sales[period_sales["last_day"] == last_day][
-            [self.iid, "period_sale"]
-        ].rename(columns={"period_sale": "period_sale_targ"})
+        last_ps = (
+            df.loc[df["last_day"] == last_day]
+              .groupby(self.iid)["t_dat"]
+              .count()
+        )
 
-        df = df.merge(last_ps, on=self.iid, how="left")
-        df["period_sale_targ"] = df["period_sale_targ"].fillna(0)
+        df["period_sale_targ"] = df[self.iid].map(last_ps).fillna(0)
 
         # ========================
         # 6. Compute sale quotient
         # ========================
-        df["quotient"] = df["period_sale_targ"] / df["period_sale"].replace(0, np.nan)
-        df["quotient"] = df["quotient"].fillna(0)
+        df["quotient"] = (
+            df["period_sale_targ"] /
+            df["period_sale"].replace(0, np.nan)
+        ).fillna(0)
 
         # ==============================
         # 7. Decay value theo dat_gap
@@ -284,25 +276,21 @@ class OrderHistoryDecay(PersonalRetrieveRule):
         # ==============================
         df = (
             df.groupby(["customer_id", self.iid], as_index=False)["value"]
-            .sum()
+              .sum()
         )
 
         # ==============================
         # 9. Ranking & filtering
         # ==============================
-        df["rank"] = df.groupby("customer_id")["value"].rank(
-            ascending=False,
-            method="first"
-        )
-
-
-        df["score"] = df["value"]
-
         df = df[df["value"] > 150]
 
-        if self.n is not None:
-            df = df[df["rank"] <= self.n]
+        # sort trước để chọn top-n nhẹ RAM
+        df = df.sort_values(["customer_id", "value"], ascending=[True, False])
 
+        if self.n is not None:
+            df = df.groupby("customer_id").head(self.n)
+
+        df["score"] = df["value"]
         df["method"] = f"OrderHistoryDecay_{self.name}"
 
         return df[["customer_id", self.iid, "score", "method"]]
