@@ -179,7 +179,7 @@ class OrderHistory(PersonalRetrieveRule):
 
         res["method"] = f"OrderHistory_{self.name}"
         res = res[["customer_id", self.iid, "score", "method"]]
-
+        print("hi-3")
         return res
 
 
