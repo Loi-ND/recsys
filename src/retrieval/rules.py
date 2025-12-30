@@ -290,10 +290,11 @@ class OrderHistoryDecay(PersonalRetrieveRule):
         # ==============================
         # 9. Ranking & filtering
         # ==============================
-        df = df.sort_values(by="value", ascending=False)
         df["rank"] = df.groupby("customer_id")["value"].rank(
-            ascending=False, method="first"
+            ascending=False,
+            method="first"
         )
+
 
         df["score"] = df["value"]
 
