@@ -158,8 +158,9 @@ class OrderHistory(PersonalRetrieveRule):
 
         tmp = df.groupby("customer_id").t_dat.max().reset_index()
         tmp.columns = ["customer_id", "max_dat"]
+        print("hi-1")
         res = df.merge(tmp, on=["customer_id"], how="left")
-
+        print("hi-2")
         res["diff_dat"] = (res.max_dat - res.t_dat).dt.days
         res = res.loc[res["diff_dat"] < self.days].reset_index(drop=True)
 
