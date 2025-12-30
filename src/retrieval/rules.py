@@ -340,6 +340,7 @@ class ItemPair(PersonalRetrieveRule):
         df = self.trans_df
         df2 = df.rename(columns={self.iid: "pair"})
 
+        print("hi")
         pair = df.merge(df2, on="customer_id")
         pair = pair[pair[self.iid] != pair["pair"]]
         pair["count"] = 1
