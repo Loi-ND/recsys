@@ -311,7 +311,7 @@ class ItemPair(PersonalRetrieveRule):
     """Customers who bought this often bought this."""
 
     def __init__(
-        self, trans_df: pd.DataFrame, name: str = "1", item_id: str = "article_id"
+        self, customer_list: List, trans_df: pd.DataFrame, name: str = "1", item_id: str = "article_id"
     ):
         """Initialize ItemPair.
 
@@ -324,8 +324,13 @@ class ItemPair(PersonalRetrieveRule):
         item_id : str, optional
             Name of item id, by default ``"article_id"``.
         """
+        self.customer_list = customer_list
         self.iid = item_id
-        self.trans_df = trans_df[["customer_id", self.iid]].drop_duplicates()
+        self.trans_df = ( 
+            trans_df.loc[trans_df["customer_id"].isin(self.customer_list),
+                                ["customer_id", self.iid]]
+                .drop_duplicates()
+            )
         self.name = name
 
     def _get_freq_pair(self) -> pd.DataFrame:
