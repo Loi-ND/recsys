@@ -284,11 +284,13 @@ class OrderHistoryDecay(PersonalRetrieveRule):
         # ==============================
         df = df[df["value"] > 150]
 
-        # sort trước để chọn top-n nhẹ RAM
-        df = df.sort_values(["customer_id", "value"], ascending=[True, False])
-
-        if self.n is not None:
-            df = df.groupby("customer_id").head(self.n)
+        top_idx = (
+                df.groupby("customer_id", sort=False)["value"]
+                .nlargest(self.n)                         # lấy top-n theo value
+                .reset_index(level=0, drop=True)          # bỏ customer_id phụ
+                .index                                    # trả về index gốc
+                )
+        df = df.loc[top_idx]
 
         df["score"] = df["value"]
         df["method"] = f"OrderHistoryDecay_{self.name}"
