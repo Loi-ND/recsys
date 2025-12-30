@@ -164,8 +164,12 @@ class OrderHistory(PersonalRetrieveRule):
         res["diff_dat"] = (res.max_dat - res.t_dat).dt.days
         res = res.loc[res["diff_dat"] < self.days].reset_index(drop=True)
         print("hi-3")
-        res = res.sort_values(by=["diff_dat"], ascending=True).reset_index(drop=True)
-        res = res.groupby(["customer_id", self.iid], as_index=False).first()
+        res["rank"] = res.groupby(["customer_id", self.iid])["diff_dat"].rank(
+            method="first"
+        )
+
+        res = res[res["rank"] == 1]
+
         print("hi-4")
         res = res.reset_index()
         res = res.sort_values(by="index", ascending=False).reset_index(drop=True)
