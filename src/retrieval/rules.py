@@ -1524,6 +1524,7 @@ class ItemGroupTimeHistory(ItemGroupRetrieveRule):
         item_df: pd.DataFrame,
         cat_cols: List[str],
         n: int = 12,
+        limit: int = 20,
         name: str = "1",
         item_id: str = "article_id",
         days: int = 7,
@@ -1553,6 +1554,7 @@ class ItemGroupTimeHistory(ItemGroupRetrieveRule):
             self.item_df, on=item_id, how="left"
         )
         self.trans_df['t_dat'] = pd.to_datetime(self.trans_df['t_dat'])
+        self.limit = limit
 
         self.cat_cols = cat_cols
         self.iid = item_id
@@ -1595,7 +1597,7 @@ class ItemGroupTimeHistory(ItemGroupRetrieveRule):
             result_df
             .sort_values(["customer_id", "score"], ascending=[True, False])
             .groupby("customer_id")
-            .head(50)
+            .head(self.limit)
         )
 
         return result_df[["customer_id", self.iid, "method", "score"]]
@@ -1612,6 +1614,7 @@ class ItemGroupSaleTrend(ItemGroupRetrieveRule):
         cat_cols: List[str],
         days: int = 7,
         n: int = 12,
+        limit: int = 20,
         name: str = "1",
         t: float = 0.8,
         item_id: str = "article_id",
@@ -1643,6 +1646,7 @@ class ItemGroupSaleTrend(ItemGroupRetrieveRule):
         self.trans_df = self.trans_df.merge(
             self.item_df, on=item_id, how="left"
         )
+        self.limit = limit
         self.cat_cols = cat_cols
         self.days = days
         self.n = n
@@ -1690,7 +1694,7 @@ class ItemGroupSaleTrend(ItemGroupRetrieveRule):
             result_df
             .sort_values(["customer_id", "score"], ascending=[True, False])
             .groupby("customer_id")
-            .head(50)
+            .head(self.limit)
         )
 
         return result_df[["customer_id", self.iid, "method", "score"]]
