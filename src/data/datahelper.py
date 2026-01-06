@@ -99,7 +99,7 @@ class DataHelper:
             Subdirectory to store raw data.
         """
         self.base = Path(data_dir)  # data diectory
-        self.raw_dir = Path(f"{os.getenv('RAW_DATA_DIR')}") # raw data directory
+        self.raw_dir = self.base/"raw" # raw data directory
 
     def _load_raw_data(self) -> dict:
         """Load original raw data
@@ -316,6 +316,20 @@ class DataHelper:
         data["item"] = item[item_sparse_feats]
 
         return data
+    
+    def _create_customer_gender(self, data: dict) -> dict:
+        items = pd.DataFrame(data['item'])
+        trans = pd.DataFrame(data['inter'])
+        users_df = trans.merge(right=items, how='inner', on='article_id')
+        users_df = users_df[['customer_id', 'article_gender']].copy()
+
+        user_gender = users_df.groupby(by='customer_id')['article_gender'].value_counts().unstack(fill_value=0).reset_index()
+        user_gender.columns.name = None
+        user_gender.columns = user_gender.columns.map(str)
+        data["user_gender"] = user_gender
+
+        return data
+
 
     def save_data(self, data: dict, name: str):
         """Save data dictionary as parquet
@@ -333,6 +347,7 @@ class DataHelper:
         data["user"].to_parquet(path / "user.pqt", engine="fastparquet")
         data["item"].to_parquet(path / "item.pqt", engine="fastparquet")
         data["inter"].to_parquet(path / "inter.pqt", engine="fastparquet")
+        data["user_gender"].to_parquet(path / "user_gender.pqt", engine="fastparquet")
 
     def load_data(self, name: str) -> dict:
         """Load data dictionary from parquet.
@@ -359,6 +374,7 @@ class DataHelper:
         data["user"] = pd.read_parquet(path / "user.pqt")
         data["item"] = pd.read_parquet(path / "item.pqt")
         data["inter"] = pd.read_parquet(path / "inter.pqt")
+        data["user_gender"] = pd.read_parquet(path / "user_gender.pqt")
 
         return data
 
@@ -384,6 +400,7 @@ class DataHelper:
         data = self._encode_id(data, "index_id_map")
         data = self._base_features(data)
         data = self._transform_feats(data)
+        data = self._create_customer_gender(data)
         if save:
             self.save_data(data, name)
         return data
