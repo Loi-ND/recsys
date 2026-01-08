@@ -419,7 +419,7 @@ class ItemPairWithinGroup(PersonalRetrieveRule):
 
         # keep only same-group pairs
         for col in self.group_cols:
-            pair = pair[pair[col] == pair[f"{col}_y"]]
+            pair = pair[pair[f"{col}_x"] == pair[f"{col}_y"]]
 
         pair["count"] = 1
 
