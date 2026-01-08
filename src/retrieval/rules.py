@@ -361,6 +361,95 @@ class ItemPair(PersonalRetrieveRule):
         df = df[["customer_id", self.iid, "method", "score"]]
         return df
 
+class ItemPairWithinGroup(PersonalRetrieveRule):
+    """Customers who bought this often bought this (within same item group)."""
+
+    def __init__(
+        self,
+        customer_list: List,
+        trans_df: pd.DataFrame,
+        item_df: pd.DataFrame,
+        group_cols: List[str],
+        name: str = "1",
+        item_id: str = "article_id",
+    ):
+        """
+        Parameters
+        ----------
+        trans_df : pd.DataFrame
+            Transaction dataframe, must include [customer_id, article_id].
+        item_df : pd.DataFrame
+            Item metadata dataframe, must include [article_id, *group_cols].
+        group_cols : List[str]
+            Item group columns used to constrain pairing
+            (e.g. ['product_type_no'] or ['product_type_no', 'colour_group_code']).
+        name : str
+            Name of the rule.
+        item_id : str
+            Item id column name.
+        """
+        self.iid = item_id
+        self.group_cols = group_cols
+        self.name = name
+        self.customer_list = customer_list
+
+        # Merge group info into transactions
+        df = ( 
+            trans_df.loc[trans_df["customer_id"].isin(self.customer_list),
+                                ["customer_id", self.iid]]
+                .drop_duplicates()
+            )
+        item_info = item_df[[self.iid, *group_cols]].drop_duplicates()
+
+        self.trans_df = df.merge(item_info, on=self.iid, how="left")
+
+    def _get_freq_pair(self) -> pd.DataFrame:
+        """Generate frequent item pairs within the same item group."""
+        df = self.trans_df
+
+        # self-join on customer_id
+        df2 = df.rename(
+            columns={self.iid: "pair"}
+        )
+
+        pair = df.merge(df2, on="customer_id")
+
+        # remove self-pair
+        pair = pair[pair[self.iid] != pair["pair"]]
+
+        # keep only same-group pairs
+        for col in self.group_cols:
+            pair = pair[pair[col] == pair[f"{col}_y"]]
+
+        pair["count"] = 1
+
+        pair = (
+            pair.groupby([self.iid, "pair"])["count"]
+            .sum()
+            .reset_index()
+        )
+
+        # keep top-1 pair per item (same as original ItemPair)
+        pair = pair.sort_values("count", ascending=False).reset_index(drop=True)
+        pair = pair.groupby(self.iid).first().reset_index()
+        pair = pair.sort_values("count", ascending=False).reset_index(drop=True)
+
+        pair["score"] = pair["count"]
+        return pair
+
+    def retrieve(self) -> pd.DataFrame:
+        pair = self._get_freq_pair()
+
+        df = self.trans_df
+        df = df.merge(pair, on=self.iid, how="left")
+
+        df = df.loc[df["pair"].notnull()]
+        df = df.drop_duplicates(["customer_id", "pair"])
+
+        df[self.iid] = df["pair"].astype("int32")
+        df["method"] = f"ItemPairWithinGroup_{self.name}"
+
+        return df[["customer_id", self.iid, "method", "score"]]
 
 class ALS(PersonalRetrieveRule):
     """ALS Collaborative Filtering."""
