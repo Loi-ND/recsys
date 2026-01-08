@@ -99,7 +99,8 @@ class DataHelper:
             Subdirectory to store raw data.
         """
         self.base = Path(data_dir)  # data diectory
-        self.raw_dir = self.base/"raw" # raw data directory
+        # self.raw_dir = self.base/"raw" # raw data directory
+        self.raw_dir = os.environ["RAW_DATA_DIR"]
 
     def _load_raw_data(self) -> dict:
         """Load original raw data
